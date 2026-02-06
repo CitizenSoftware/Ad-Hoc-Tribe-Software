@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Tribe Properties — Map</title>
+
+  <link rel="stylesheet" href="/src/styles/app.css" />
+
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.css" />
+  <script src="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.js"></script>
+
+  <link href="https://api.mapbox.com/mapbox.js/plugins/leaflet-fullscreen/v1.0.1/leaflet.fullscreen.css" rel="stylesheet" />
+  <script src="https://api.mapbox.com/mapbox.js/plugins/leaflet-fullscreen/v1.0.1/Leaflet.fullscreen.min.js"></script>
+
+  <script src="https://cdn.jsdelivr.net/npm/@turf/turf@6.5.0/turf.min.js"></script>
+</head>
+<body>
+  <div class="min-h-screen bg-slate-100 p-4">
+    <div class="card mb-4 px-4 py-3">
+      <div class="flex flex-wrap items-center gap-3">
+        <div class="flex items-center gap-2 text-sm font-semibold text-slate-700">
+          TRIBE
+        </div>
+
+        <nav class="flex items-center gap-2 text-xs">
+          <a class="rounded-full border border-slate-200 bg-white px-3 py-1" href="/index.html">Dashboard</a>
+          <a class="rounded-full border border-slate-200 bg-slate-900 px-3 py-1 text-white" href="/map.html">Map</a>
+          <a class="rounded-full border border-slate-200 bg-white px-3 py-1" href="/messages.html">Messages</a>
+        </nav>
+
+        <div class="ml-auto flex items-center gap-2">
+          <button class="btn" id="authBtn">Sign In</button>
+        </div>
+      </div>
+
+      <div class="mt-3 flex flex-wrap items-center gap-3">
+        <div class="pill">Properties System</div>
+        <select id="unitSelect" class="h-8 rounded-md border border-slate-200 bg-white px-2 text-sm">
+          <option value="imperial">Imperial (ft / ac)</option>
+          <option value="metric">Metric (m / ha)</option>
+        </select>
+      </div>
+
+      <div class="mt-3 flex flex-wrap gap-2">
+        <div class="stat">
+          <div class="stat-label">Properties</div>
+          <div id="totProperties" class="stat-value">0</div>
+        </div>
+        <div class="stat">
+          <div id="totAcreLabel" class="stat-label">Acreage</div>
+          <div id="totAcre" class="stat-value">0</div>
+        </div>
+        <div class="stat">
+          <div class="stat-label">Population</div>
+          <div id="totPopulation" class="stat-value">0</div>
+        </div>
+        <div class="stat">
+          <div class="stat-label">Income</div>
+          <div id="totIncome" class="stat-value">$0</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="grid gap-4 lg:grid-cols-[260px_1fr]">
+      <div class="card hidden flex-col lg:flex" id="leftSidebar">
+        <div class="p-4">
+          <div class="panel-title">Layers</div>
+          <div class="mt-3" id="layersList"></div>
+          <label class="mt-4">New Layer</label>
+          <div class="mt-2 flex gap-2">
+            <input id="newLayerName" class="h-9" placeholder="Layer name" />
+            <button class="btn" id="addLayer">Add</button>
+          </div>
+          <div class="mt-4 flex flex-wrap gap-2">
+            <button class="btn" id="importBtn">Import GeoJSON</button>
+            <button class="btn" id="exportBtn">Export GeoJSON</button>
+            <input type="file" id="fileInput" class="hidden" accept=".geojson,application/json" />
+          </div>
+          <div class="mt-4 rounded-md border border-slate-200 bg-slate-50 px-2 py-1 text-xs text-slate-500" id="mapStatus">Ready</div>
+        </div>
+      </div>
+
+      <div class="card h-[75vh] overflow-hidden">
+        <div id="map" class="h-full w-full"></div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="/src/pages/map.js"></script>
+</body>
+</html>
