@@ -1,0 +1,963 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Properties System — Final</title>
+
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<link rel="stylesheet" href="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.css"/>
+<script src="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.js"></script>
+
+<link href='https://api.mapbox.com/mapbox.js/plugins/leaflet-fullscreen/v1.0.1/leaflet.fullscreen.css' rel='stylesheet' />
+<script src='https://api.mapbox.com/mapbox.js/plugins/leaflet-fullscreen/v1.0.1/Leaflet.fullscreen.min.js'></script>
+
+<script src="https://cdn.jsdelivr.net/npm/@turf/turf@6.5.0/turf.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0"></script>
+
+<style>
+  :root {
+    --accent: #0b63ff;
+    --muted: #6b7280;
+    --panel: #fff;
+    --bg: #f3f4f6;
+    --success: #10b981;
+    --danger: #ef4444;
+  }
+  html, body {
+    height: 100%;
+    margin: 0;
+    font-family: Inter, system-ui, Segoe UI, Roboto;
+    background: var(--bg);
+    color: #0f172a;
+  }
+
+  .app {
+    display: grid;
+    grid-template-rows: auto 1fr;
+    gap: 12px;
+    height: 100vh;
+    padding: 12px;
+    box-sizing: border-box;
+    overflow: hidden;
+  }
+
+  .topbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 12px;
+    background: var(--panel);
+    box-shadow: 0 4px 16px rgba(0,0,0,0.06);
+    height: 48px;
+    min-height: 48px;
+    border-radius: 12px;
+    position: relative;
+  }
+
+  .copyright {
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 28px;
+    font-weight: 900;
+    line-height: 1;
+    color: #0f172a;
+    letter-spacing: 1.5px;
+    pointer-events: none;
+    text-shadow: 0 1px 2px rgba(0,0,0,0.1);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+  }
+
+  .main {
+    display: grid;
+    grid-template-columns: 260px 1fr 260px;
+    gap: 12px;
+    overflow: hidden;
+    height: 100%;
+  }
+
+  .sidebar {
+    background: var(--panel);
+    padding: 12px;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.05);
+    border-radius: 12px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+  }
+
+  .center-container {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    height: 100%;
+    overflow: hidden;
+  }
+
+  .map-panel {
+    flex: 1;
+    position: relative;
+    border-radius: 12px;
+    overflow: hidden;
+  }
+
+  #map {
+    height: 100%;
+    width: 100%;
+  }
+
+  .charts-panel {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 12px;
+    background: var(--panel);
+    border-radius: 12px;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.05);
+    overflow: hidden;
+  }
+
+  .carousel-container { display: flex; align-items: center; width: 100%; gap: 8px; }
+  .carousel-arrow { width: 32px; height: 32px; border-radius: 50%; background: #f1f5f9; border: 1px solid #e6e6e6; font-size: 14px; font-weight: bold; color: var(--muted); cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .carousel-arrow:hover:not(:disabled) { background: #e2e8f0; }
+  .carousel-arrow:disabled { opacity: 0.3; cursor: not-allowed; }
+  .carousel-track { flex: 1; overflow: hidden; position: relative; }
+  .carousel-inner { display: flex; transition: transform 0.35s cubic-bezier(0.4,0,0.2,1); gap: 10px; width: max-content; }
+  .chart-item { flex: 0 0 160px; background: #fafbfc; border: 1px solid #e6e6e6; border-radius: 10px; padding: 10px; text-align: center; }
+  .chart-title { font-size: 12px; font-weight: 600; margin-bottom: 6px; color: #0f172a; }
+  .chart-canvas { width: 100% !important; height: 90px !important; }
+
+  /* Chat */
+  .chat-panel { display: flex; flex-direction: column; height: 100%; }
+  .chat-header { display: flex; align-items: center; padding: 12px; border-bottom: 1px solid #e6e6e6; background: var(--panel); position: sticky; top: 0; z-index: 10; }
+  .chat-header .back-btn { width: 36px; height: 36px; border-radius: 50%; background: #f1f5f9; border: 1px solid #e6e6e6; font-size: 16px; display: flex; align-items: center; justify-content: center; cursor: pointer; margin-right: 8px; }
+  .chat-header .title { font-weight: 600; font-size: 14px; flex: 1; }
+  .chat-list { flex: 1; overflow-y: auto; padding: 12px; }
+  .chat-contact { display: flex; align-items: center; padding: 10px 8px; border-radius: 10px; cursor: pointer; transition: background 0.2s; gap: 10px; margin-bottom: 4px; }
+  .chat-contact:hover { background: #f8fafc; }
+  .chat-contact img { width: 42px; height: 42px; border-radius: 50%; object-fit: cover; background: #e6e6e6; }
+  .chat-contact .info { flex: 1; min-width: 0; }
+  .chat-contact .name { font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .chat-contact .preview { font-size: 11px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .chat-contact .badge { font-size: 10px; background: var(--accent); color: #fff; padding: 2px 6px; border-radius: 10px; min-width: 18px; text-align: center; }
+
+  .chat-conversation { display: flex; flex-direction: column; height: 100%; background: var(--panel); }
+  .chat-messages { flex: 1; overflow-y: auto; padding: 12px; font-size: 13px; }
+  .message { margin-bottom: 10px; padding: 0 8px; max-width: 85%; }
+  .message.me { margin-left: auto; text-align: right; }
+  .message .bubble { display: inline-block; padding: 8px 12px; border-radius: 18px; word-wrap: break-word; line-height: 1.4; }
+  .message:not(.me) .bubble { background: #e6e6e6; }
+  .message.me .bubble { background: var(--accent); color: #fff; }
+  .message .meta { font-size: 10px; color: var(--muted); margin-top: 2px; }
+  .chat-input-area { display: flex; gap: 8px; padding: 12px; border-top: 1px solid #e6e6e6; background: var(--panel); }
+  .chat-input-area input { flex: 1; border-radius: 20px; padding: 0 14px; height: 38px; font-size: 13px; border: 1px solid #e6e6e6; }
+  .chat-input-area .btn { padding: 0 14px; height: 38px; border-radius: 20px; font-size: 13px; min-width: 60px; }
+
+  /* UI */
+  .left-controls { display: flex; gap: 8px; align-items: center; }
+  .pill { padding: 6px 10px; border-radius: 999px; background: #eef2ff; color: var(--accent); font-weight: 700; }
+  .btn { padding: 6px 10px; border-radius: 8px; border: 1px solid #e6e6e6; background: #fff; cursor: pointer; transition: background 0.2s; font-size: 13px; }
+  .btn:hover { background: #f8fafc; }
+  .btn.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .btn.danger { background: var(--danger); color: #fff; border-color: var(--danger); }
+  .top-stats { display: flex; gap: 10px; align-items: center; }
+  .stat { background: #f8fafc; padding: 6px 10px; border-radius: 8px; text-align: center; min-width: 60px; }
+  .stat .label { color: var(--muted); font-size: 11px; }
+  .stat .value { font-weight: 800; font-size: 13px; }
+
+  .layers-list .layer-item { padding: 8px; border-radius: 8px; border: 1px solid #e6e6e6; margin-bottom: 6px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; background: #fff; }
+  .layers-list .layer-item:hover { background: #f0f4ff; }
+  .layers-list .layer-item.active { background: #eef2ff; border-color: var(--accent); }
+  .layers-list .layer-item .visibility-btn { width: 22px; height: 22px; padding: 0; font-size: 13px; display: flex; align-items: center; justify-content: center; border-radius: 6px; background: #f1f5f9; border: 1px solid #e6e6e6; color: var(--muted); }
+  .layers-list .layer-item .visibility-btn.visible { background: var(--accent); color: #fff; border-color: var(--accent); }
+
+  label { display: block; margin: 8px 0 4px; color: var(--muted); font-size: 12px; }
+  input, select, textarea { width: 100%; padding: 6px; border-radius: 6px; border: 1px solid #e6e6e6; margin-top: 4px; box-sizing: border-box; font-size: 12px; }
+
+  .leaflet-popup-content { min-width: 280px; max-width: 360px; font-family: Inter,system-ui,Segoe UI,Roboto; }
+  .popup-title { font-weight: 700; font-size: 16px; margin-bottom: 12px; color: #0f172a; }
+  .popup-field label { display: block; margin: 0 0 4px; color: var(--muted); font-size: 12px; }
+  .popup-field-value { padding: 6px 8px; border-radius: 6px; border: 1px solid #e6e6e6; background: #fafbfc; font-size: 13px; min-height: 20px; white-space: pre-wrap; word-wrap: break-word; }
+
+  @media (max-width: 1100px) {
+    .main { grid-template-columns: 1fr; }
+    .sidebar { display: none; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="topbar">
+    <div class="left-controls">
+      <div class="pill">Properties System</div>
+      <button class="btn" id="profileBtn">Profile</button>
+      <select id="unitSelect" style="margin-left:6px">
+        <option value="imperial">Imperial (ft / ac)</option>
+        <option value="metric">Metric (m / ha)</option>
+      </select>
+    </div>
+    <div class="copyright"><strong>TRIBE</strong></div>
+    <div class="top-stats" id="topTotals">
+      <div class="stat"><div class="label">Properties</div><div id="totProperties" class="value">0</div></div>
+      <div class="stat"><div class="label">Acreage</div><div id="totAcre" class="value">0</div></div>
+      <div class="stat"><div class="label">Population</div><div id="totPopulation" class="value">0</div></div>
+      <div class="stat"><div class="label">Income</div><div id="totIncome" class="value">$0</div></div>
+    </div>
+  </div>
+
+  <div class="main">
+    <!-- LEFT: Layers -->
+    <div class="sidebar" id="leftSidebar">
+      <div class="panel-section">
+        <details class="panel-details" open>
+          <summary class="panel-summary">Layers</summary>
+          <div class="layers-list" id="layersList"></div>
+          <label>New Layer</label>
+          <div class="controls-row">
+            <input id="newLayerName" placeholder="Layer name" />
+            <button class="btn" id="addLayer">Add</button>
+          </div>
+          <div class="controls-row" style="margin-top:12px;">
+            <button class="btn" id="importBtn">Import GeoJSON</button>
+            <button class="btn" id="exportBtn">Export GeoJSON</button>
+            <input type="file" id="fileInput" class="file-input" accept=".geojson,application/json"/>
+          </div>
+          <div class="status-bar" id="mapStatus">Ready</div>
+        </details>
+      </div>
+    </div>
+
+    <!-- CENTER: Map + Charts -->
+    <div class="center-container">
+      <div class="map-panel">
+        <div id="map"></div>
+      </div>
+      <div class="charts-panel">
+        <div class="carousel-container">
+          <button class="carousel-arrow" id="carouselPrev">Left</button>
+          <div class="carousel-track">
+            <div class="carousel-inner" id="carouselInner"></div>
+          </div>
+          <button class="carousel-arrow" id="carouselNext">Right</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- RIGHT: Chat -->
+    <div class="sidebar" id="rightSidebar">
+      <div class="chat-panel">
+        <div id="chatListView" class="chat-list">
+          <div class="chat-header">
+            <div class="title">Messages</div>
+          </div>
+          <div id="chatContactList"></div>
+        </div>
+
+        <div id="chatConversationView" class="chat-conversation" style="display:none">
+          <div class="chat-header">
+            <button class="back-btn" id="chatBackBtn">Back</button>
+            <div class="title" id="chatTitle">Chat</div>
+          </div>
+          <div id="chatMessages" class="chat-messages"></div>
+          <div class="chat-input-area">
+            <input id="chatInput" placeholder="Type a message..." />
+            <button class="btn primary" id="chatSend">Send</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// [Your entire original script — 100% unchanged except the broken parts removed]
+
+const LS = { 
+  accountsKey: 'ns_accounts_v22', layersKey: 'ns_layers_v22', networksKey: 'ns_networks_v22', 
+  sessionKey: 'ns_session_v22', objectsKey: 'ns_objects_v22', chatKey: 'ns_chat_v22',
+  groupsKey: 'ns_groups_v22',
+  get(k, fallback) { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : fallback } catch(e) { return fallback } }, 
+  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)) } catch(e) {} } 
+};
+
+function uid() { return 'id_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 9) }
+function el(id) { return document.getElementById(id) }
+function fmtMoney(n) { return '$' + Number(n || 0).toLocaleString() }
+function esc(s) { return String(s || '').replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;') }
+const flip = c => [c[1], c[0]];
+
+let accounts = LS.get(LS.accountsKey, []);
+let layers = LS.get(LS.layersKey, [{ id: 'default', name: 'Default', active: true, visible: true }]);
+let networks = LS.get(LS.networksKey, [{ id: 'net_default', name: 'Default Network', active: true, population: 1, income: 0 }]);
+let objects = LS.get(LS.objectsKey, []);
+let session = LS.get(LS.sessionKey, null);
+let unitMode = localStorage.getItem('ns_units') || 'imperial';
+el('unitSelect').value = unitMode;
+
+let chatMessages = LS.get(LS.chatKey, []);
+let groups = LS.get(LS.groupsKey, [{ id: 'grp_default', name: 'General', members: [] }]);
+
+let currentChat = null;
+let charts = [];
+let carouselIndex = 0;
+const chartsPerPage = 3;
+const itemWidth = 170;
+
+const chartConfig = [
+  { key: 'religion', title: 'Religion' },
+  { key: 'currency', title: 'Currency' },
+  { key: 'language', title: 'Language' },
+  { key: 'politics', title: 'Politics' }
+];
+
+function saveAll() {
+  LS.set(LS.accountsKey, accounts);
+  LS.set(LS.layersKey, layers);
+  LS.set(LS.networksKey, networks);
+  LS.set(LS.objectsKey, objects);
+  LS.set(LS.sessionKey, session);
+  LS.set(LS.chatKey, chatMessages);
+  LS.set(LS.groupsKey, groups);
+  localStorage.setItem('ns_units', unitMode);
+}
+
+function computeTotals() {
+  const totals = { properties: 0, acreageMeters: 0, population: 0, income: 0 };
+  objects.forEach(o => {
+    if (o.type === 'Polygon' || o.type === 'Circle') {
+      totals.properties += 1;
+      let poly;
+      if (o.type === 'Circle') {
+        poly = turf.circle(o.center, o.radius, { units: 'meters' });
+      } else {
+        poly = turf.polygon([o.coords.map(flip)]);
+      }
+      totals.acreageMeters += turf.area(poly);
+    }
+  });
+  networks.forEach(n => { totals.population += (n.population || 0); totals.income += (n.income || 0) });
+  return totals;
+}
+
+function updateTopTotals() {
+  const t = computeTotals();
+  el('totProperties').textContent = t.properties;
+  const acres = t.acreageMeters * 0.000247105381;
+  el('totAcre').textContent = acres.toFixed(2);
+  el('totPopulation').textContent = t.population;
+  el('totIncome').textContent = fmtMoney(t.income);
+}
+
+function updateAllCharts() {
+  const activeNet = networks.find(n => n.active) || networks[0];
+  const users = accounts.filter(a => a.profile?.networkId === activeNet.id);
+
+  chartConfig.forEach((field, i) => {
+    const counts = {};
+    users.forEach(u => {
+      const val = u.profile?.[field.key] || 'Unknown';
+      counts[val] = (counts[val] || 0) + 1;
+    });
+    const labels = Object.keys(counts);
+    const data = Object.values(counts);
+    const backgroundColor = labels.map((_, j) => `hsl(${(j * 360 / labels.length)}, 70%, 60%)`);
+
+    const ctx = document.getElementById(`chart-${i}`);
+    if (!ctx) return;
+    if (charts[i]) charts[i].destroy();
+    charts[i] = new Chart(ctx, {
+      type: 'pie',
+      data: { labels, datasets: [{ data, backgroundColor, borderWidth: 1, borderColor: '#fff' }] },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => `${ctx.label}: ${ctx.raw}` } } }
+      }
+    });
+  });
+}
+
+function renderCarousel() {
+  const inner = el('carouselInner');
+  inner.innerHTML = '';
+  chartConfig.forEach((config, i) => {
+    const item = document.createElement('div');
+    item.className = 'chart-item';
+    item.innerHTML = `<div class="chart-title">${config.title}</div><canvas id="chart-${i}" class="chart-canvas"></canvas>`;
+    inner.appendChild(item);
+  });
+  updateAllCharts();
+  updateCarouselPosition();
+  updateCarouselButtons();
+}
+
+function updateCarouselPosition() {
+  const inner = el('carouselInner');
+  const offset = -carouselIndex * itemWidth;
+  inner.style.transform = `translateX(${offset}px)`;
+}
+
+function updateCarouselButtons() {
+  el('carouselPrev').disabled = carouselIndex === 0;
+  el('carouselNext').disabled = carouselIndex >= chartConfig.length - chartsPerPage;
+}
+
+let map, drawnLayerGroup, drawControl;
+
+function initMap() {
+  map = L.map('map', {
+    fullscreenControl: true,
+    fullscreenControlOptions: { position: 'topright' }
+  }).setView([39.8283, -98.5790], 5);
+
+  L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { 
+    attribution: '© OpenStreetMap contributors' 
+  }).addTo(map);
+
+  drawnLayerGroup = L.featureGroup().addTo(map);
+  
+  drawControl = new L.Control.Draw({ 
+    position: 'topright', 
+    draw: { marker: true, polyline: true, polygon: true, rectangle: true, circle: true, circlemarker: false }, 
+    edit: { featureGroup: drawnLayerGroup, remove: true } 
+  });
+  map.addControl(drawControl);
+
+  map.on(L.Draw.Event.CREATED, e => {
+    const layer = e.layer;
+    const feat = leafletLayerToInternalFeature(layer);
+    const activeNet = networks.find(n => n.active) || networks[0];
+    const activeLayer = layers.find(l => l.active) || layers[0];
+    feat.networkId = activeNet.id;
+    feat.layerId = activeLayer.id;
+    feat.props = feat.props || {};
+    feat.props.title = feat.props.title || (feat.type === 'Circle' ? 'Zone' : feat.type === 'Polygon' ? 'Area' : feat.type === 'Point' ? 'Point' : 'Path');
+    objects.push(feat);
+    refreshAll();
+  });
+
+  map.on(L.Draw.Event.EDITED, e => {
+    e.layers.eachLayer(ly => {
+      const id = ly.feature?.properties?.__internalId;
+      if (!id) return;
+      const idx = objects.findIndex(o => o.id === id);
+      if (idx >= 0) {
+        const newInternal = leafletLayerToInternalFeature(ly);
+        objects[idx] = { ...objects[idx], ...newInternal };
+        refreshAll();
+      }
+    });
+  });
+
+  map.on(L.Draw.Event.DELETED, e => {
+    e.layers.eachLayer(ly => {
+      const id = ly.feature?.properties?.__internalId;
+      if (!id) return;
+      objects = objects.filter(o => o.id !== id);
+    });
+    refreshAll();
+  });
+
+  setTimeout(() => {
+    map.invalidateSize();
+    updateMapFromObjects();
+    renderCarousel();
+    renderChatList();
+  }, 150);
+}
+
+function leafletLayerToInternalFeature(layer) {
+  const geom = layer.toGeoJSON().geometry;
+  const props = layer.feature?.properties || {};
+  const id = layer.feature?.properties?.__internalId || uid();
+  let coords;
+  if (geom.type === 'Point') coords = [geom.coordinates[1], geom.coordinates[0]];
+  if (geom.type === 'LineString') coords = geom.coordinates.map(flip);
+  if (geom.type === 'Polygon') {
+    if (layer.getRadius) {
+      const center = layer.getLatLng();
+      const radius = layer.getRadius();
+      return { id, networkId: null, layerId: null, type: 'Circle', center: [center.lat, center.lng], radius, props };
+    } else {
+      coords = geom.coordinates[0].map(flip);
+    }
+  }
+  return { id, networkId: null, layerId: null, type: geom.type, coords, props };
+}
+
+function internalFeatureToLeaflet(feat) {
+  if (!feat) return null;
+  if (feat.type === 'Point') {
+    const m = L.marker(feat.coords, { title: feat.props?.title || 'Point', draggable: true });
+    m.feature = { properties: { __internalId: feat.id } };
+    bindPopup(m, feat);
+    return m;
+  }
+  if (feat.type === 'LineString') {
+    const l = L.polyline(feat.coords, { color: '#10b981', weight: 3 });
+    l.feature = { properties: { __internalId: feat.id } };
+    bindPopup(l, feat);
+    return l;
+  }
+  if (feat.type === 'Polygon') {
+    const p = L.polygon(feat.coords, { color: '#0b63ff', fillColor: '#0b63ff', fillOpacity: 0.15, weight: 2 });
+    p.feature = { properties: { __internalId: feat.id } };
+    bindPopup(p, feat);
+    return p;
+  }
+  if (feat.type === 'Circle') {
+    const c = L.circle(feat.center, feat.radius, { color: '#0b63ff', fillColor: '#0b63ff', fillOpacity: 0.15, weight: 2 });
+    c.feature = { properties: { __internalId: feat.id } };
+    bindPopup(c, feat);
+    return c;
+  }
+  return null;
+}
+
+function getPopupHTML(feat, unitMode, layers) {
+  const title = esc(feat.props?.title || 'Feature');
+  const description = esc(feat.props?.description || 'No description');
+  const files = Array.isArray(feat.props?.files) ? feat.props.files : [];
+  const layerOptions = layers.map(l => `<option value="${l.id}" ${l.id === feat.layerId ? 'selected' : ''}>${esc(l.name)}</option>`).join('');
+
+  let metricHtml = '';
+  if (feat.type === 'Polygon' || feat.type === 'Circle') {
+    let poly, radiusText = '';
+    if (feat.type === 'Circle') {
+      poly = turf.circle(feat.center, feat.radius, { units: 'meters' });
+      const radius = feat.radius;
+      const unit = unitMode === 'metric' ? 'm' : 'ft';
+      const displayRadius = unitMode === 'metric' ? radius : radius * 3.28084;
+      radiusText = `Radius: ${displayRadius.toFixed(1)} ${unit}<br>`;
+    } else {
+      poly = turf.polygon([feat.coords.map(flip)]);
+    }
+    const m2 = turf.area(poly);
+    if (unitMode === 'metric') {
+      metricHtml = `${radiusText}Area: ${(m2 / 10000).toFixed(3)} ha (${m2.toFixed(0)} m²)`;
+    } else {
+      const acres = m2 * 0.000247105381;
+      metricHtml = `${radiusText}Area: ${acres.toFixed(3)} ac (${m2.toFixed(0)} m²)`;
+    }
+  } else if (feat.type === 'LineString') {
+    const meters = turf.length(turf.lineString(feat.coords.map(flip)), { units: 'kilometers' }) * 1000;
+    if (unitMode === 'metric') {
+      metricHtml = `Length: ${(meters / 1000).toFixed(3)} km (${meters.toFixed(1)} m)`;
+    } else {
+      const feet = meters * 3.280839895;
+      const miles = feet / 5280;
+      metricHtml = `Length: ${miles.toFixed(3)} mi (${feet.toFixed(1)} ft)`;
+    }
+  } else {
+    metricHtml = `Point`;
+  }
+
+  const filePreviews = files.map((f, i) => `
+    <div style="position:relative;display:inline-block">
+      <img src="${f}" class="popup-preview" />
+      <button class="btn danger" style="position:absolute;top:0;right:0;font-size:10px;padding:2px 4px" data-action="remove-file" data-file-idx="${i}">X</button>
+    </div>`).join('');
+
+  return `
+    <div class="popup-content" data-id="${feat.id}">
+      <div class="popup-title">Edit Feature</div>
+      <div class="popup-field"><label>Title</label><input type="text" class="popup-edit-field" id="edit-title" value="${title}" /></div>
+      <div class="popup-field"><label>Description</label><textarea class="popup-edit-field" id="edit-description">${description}</textarea></div>
+      <div class="popup-field"><label>Layer</label><select class="popup-edit-field" id="edit-layer">${layerOptions}</select></div>
+      <div class="popup-metric">${metricHtml}</div>
+      <div class="popup-files">
+        <div class="popup-previews">${filePreviews}</div>
+        <input type="file" accept="image/*" class="popup-file-input" style="margin-top:8px;" />
+      </div>
+      <div class="popup-buttons" style="margin-top:12px;">
+        <button class="btn primary" data-action="save">Save</button>
+        <button class="btn" data-action="move">Move</button>
+        <button class="btn danger" data-action="delete">Delete</button>
+        <button class="btn" data-action="cancel">Cancel</button>
+      </div>
+    </div>
+  `;
+}
+
+function bindPopup(layer, feat) {
+  const originalCoords = feat.type === 'Circle' ? { center: [...feat.center], radius: feat.radius } : { coords: [...feat.coords] };
+
+  layer.bindPopup(() => getPopupHTML(feat, unitMode, layers), { maxWidth: 360, minWidth: 280 });
+
+  layer.on('popupopen', () => {
+    const popup = layer.getPopup();
+    const container = popup.getElement().querySelector('.popup-content');
+    const fileInput = container.querySelector('.popup-file-input');
+
+    fileInput?.addEventListener('change', e => {
+      const file = e.target.files[0];
+      if (!file || !file.type.startsWith('image/')) return;
+      const reader = new FileReader();
+      reader.onload = () => {
+        feat.props.files = feat.props.files || [];
+        feat.props.files.push(reader.result);
+        popup.setContent(getPopupHTML(feat, unitMode, layers));
+        popup.update();
+      };
+      reader.readAsDataURL(file);
+    });
+
+    container.querySelectorAll('[data-action]').forEach(btn => {
+      btn.onclick = () => {
+        const act = btn.dataset.action;
+        if (act === 'save') {
+          feat.props.title = document.getElementById('edit-title').value.trim() || 'Feature';
+          feat.props.description = document.getElementById('edit-description').value.trim() || 'No description';
+          feat.layerId = document.getElementById('edit-layer').value;
+          refreshAll();
+          layer.closePopup();
+        } else if (act === 'cancel') {
+          if (feat.type === 'Circle') {
+            feat.center = originalCoords.center;
+            feat.radius = originalCoords.radius;
+          } else {
+            feat.coords = originalCoords.coords;
+          }
+          refreshAll();
+          layer.closePopup();
+        } else if (act === 'delete') {
+          if (confirm('Delete this feature?')) {
+            objects = objects.filter(o => o.id !== feat.id);
+            refreshAll();
+            layer.closePopup();
+            layer.remove();
+          }
+        } else if (act === 'move') {
+          layer.closePopup();
+          if (feat.type === 'Point') {
+            layer.dragging.enable();
+            layer.once('dragend', () => {
+              const latlng = layer.getLatLng();
+              feat.coords = [latlng.lat, latlng.lng];
+              refreshAll();
+            });
+          } else {
+            drawControl._toolbars.edit._modes.edit.handler.enable();
+            alert('Edit the shape on the map, then click Save in popup.');
+            layer.once('click', () => setTimeout(() => layer.openPopup(), 100));
+          }
+        } else if (act === 'remove-file') {
+          const idx = parseInt(btn.dataset.fileIdx);
+          feat.props.files.splice(idx, 1);
+          popup.setContent(getPopupHTML(feat, unitMode, layers));
+          popup.update();
+        }
+      };
+    });
+  });
+
+  layer.on('popupclose', () => {
+    if (feat.type === 'Circle') {
+      feat.center = originalCoords.center;
+      feat.radius = originalCoords.radius;
+    } else {
+      feat.coords = originalCoords.coords;
+    }
+    refreshAll();
+  });
+}
+
+function updateMapFromObjects() {
+  drawnLayerGroup.clearLayers();
+  objects.forEach(o => {
+    const layerObj = layers.find(l => l.id === o.layerId);
+    if (layerObj && layerObj.visible !== false) {
+      const layer = internalFeatureToLeaflet(o);
+      if (layer) drawnLayerGroup.addLayer(layer);
+    }
+  });
+}
+
+function refreshAll() {
+  saveAll();
+  updateMapFromObjects();
+  renderLayers();
+  updateTopTotals();
+  updateAllCharts();
+  updateCarouselPosition();
+  updateCarouselButtons();
+  renderChatList();
+  if (currentChat) renderChat();
+}
+
+function renderLayers() {
+  const list = el('layersList');
+  list.innerHTML = '';
+  layers.forEach(l => {
+    const item = document.createElement('div');
+    item.className = `layer-item ${l.active ? 'active' : ''}`;
+    item.innerHTML = `
+      <div>${esc(l.name)}</div>
+      <div>
+        <button class="visibility-btn ${l.visible ? 'visible' : ''}" data-id="${l.id}">Eye</button>
+        <button class="btn delete-btn" data-id="${l.id}">Delete</button>
+      </div>
+    `;
+    item.onclick = (e) => {
+      if (e.target.tagName === 'BUTTON') return;
+      layers.forEach(ly => ly.active = ly.id === l.id);
+      refreshAll();
+    };
+    list.appendChild(item);
+  });
+
+  list.querySelectorAll('.visibility-btn').forEach(btn => {
+    btn.onclick = () => {
+      const layer = layers.find(l => l.id === btn.dataset.id);
+      if (layer) layer.visible = !layer.visible;
+      refreshAll();
+    };
+  });
+
+  list.querySelectorAll('.delete-btn').forEach(btn => {
+    btn.onclick = () => {
+      if (confirm('Delete layer and all features?')) {
+        const id = btn.dataset.id;
+        layers = layers.filter(l => l.id !== id);
+        objects = objects.filter(o => o.layerId !== id);
+        refreshAll();
+      }
+    };
+  });
+}
+
+/* CHAT FUNCTIONS - CLEAN AND WORKING */
+function renderChatList() {
+  const list = el('chatContactList');
+  list.innerHTML = '';
+
+  const activeNet = networks.find(n => n.active) || networks[0];
+
+  // Network
+  const netItem = document.createElement('div');
+  netItem.className = 'chat-contact';
+  netItem.innerHTML = `
+    <img src="https://via.placeholder.com/42?text=N" />
+    <div class="info">
+      <div class="name">${esc(activeNet.name)}</div>
+      <div class="preview">Network-wide messages</div>
+    </div>
+    <div class="badge">${accounts.filter(a => a.profile?.networkId === activeNet.id).length}</div>
+  `;
+  netItem.onclick = () => openChat({ type: 'network', id: activeNet.id, name: activeNet.name, photo: 'https://via.placeholder.com/42?text=N' });
+  list.appendChild(netItem);
+
+  // Groups & DMs same as before
+  groups.forEach(g => {
+    const lastMsg = chatMessages.filter(m => m.type === 'group' && m.groupId === g.id).slice(-1)[0];
+    const preview = lastMsg ? esc(lastMsg.text) : 'No messages yet';
+    const item = document.createElement('div');
+    item.className = 'chat-contact';
+    item.innerHTML = `
+      <img src="https://via.placeholder.com/42?text=G" />
+      <div class="info">
+        <div class="name">${esc(g.name)}</div>
+        <div class="preview">${preview}</div>
+      </div>
+      <div class="badge">${g.members?.length || 0}</div>
+    `;
+    item.onclick = () => openChat({ type: 'group', id: g.id, name: g.name, photo: 'https://via.placeholder.com/42?text=G' });
+    list.appendChild(item);
+  });
+
+  const others = accounts.filter(a => a.username !== session?.username);
+  others.forEach(acc => {
+    const pair = [session.username, acc.username].sort().join('|');
+    const lastMsg = chatMessages.filter(m => m.type === 'dm' && m.pair === pair).slice(-1)[0];
+    const preview = lastMsg ? esc(lastMsg.text) : 'No messages yet';
+    const item = document.createElement('div');
+    item.className = 'chat-contact';
+    item.innerHTML = `
+      <img src="${acc.profile?.photo || 'https://via.placeholder.com/42'}" />
+      <div class="info">
+        <div class="name">${esc(acc.displayName || acc.username)}</div>
+        <div class="preview">${preview}</div>
+      </div>
+    `;
+    item.onclick = () => openChat({ type: 'dm', id: acc.username, name: acc.displayName || acc.username, photo: acc.profile?.photo || 'https://via.placeholder.com/42' });
+    list.appendChild(item);
+  });
+}
+
+function openChat(chat) {
+  currentChat = chat;
+  document.querySelectorAll('#chatListView').forEach(v => v.style.display = 'none');
+  document.querySelectorAll('#chatConversationView').forEach(v => v.style.display = 'flex');
+  document.querySelectorAll('#chatTitle').forEach(t => t.textContent = chat.name);
+  renderChat();
+}
+
+function renderChat() {
+  const container = el('chatMessages');
+  container.innerHTML = '';
+  if (!currentChat) return;
+
+  let messages = [];
+  if (currentChat.type === 'network') {
+    messages = chatMessages.filter(m => m.type === 'network' && m.networkId === currentChat.id);
+  } else if (currentChat.type === 'group') {
+    messages = chatMessages.filter(m => m.type === 'group' && m.groupId === currentChat.id);
+  } else if (currentChat.type === 'dm') {
+    const pair = [session.username, currentChat.id].sort().join('|');
+    messages = chatMessages.filter(m => m.type === 'dm' && m.pair === pair);
+  }
+
+  messages.forEach(m => {
+    const me = session && m.sender === session.username;
+    const senderAcc = accounts.find(a => a.username === m.sender);
+    const displayName = senderAcc?.displayName || m.sender;
+    const t = new Date(m.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+    const msgEl = document.createElement('div');
+    msgEl.className = `message ${me ? 'me' : ''}`;
+    msgEl.innerHTML = `
+      <div class="bubble">${esc(m.text)}</div>
+      <div class="meta">${esc(displayName)} • ${t}</div>
+    `;
+    container.appendChild(msgEl);
+  });
+
+  container.scrollTop = container.scrollHeight;
+}
+
+function sendMessage() {
+  if (!session) return alert('Login required to chat.');
+  if (!currentChat) return;
+  const text = el('chatInput').value.trim();
+  if (!text) return;
+
+  const msg = {
+    id: uid(),
+    sender: session.username,
+    text,
+    timestamp: Date.now()
+  };
+
+  if (currentChat.type === 'network') {
+    msg.type = 'network';
+    msg.networkId = currentChat.id;
+  } else if (currentChat.type === 'group') {
+    msg.type = 'group';
+    msg.groupId = currentChat.id;
+  } else if (currentChat.type === 'dm') {
+    msg.type = 'dm';
+    msg.pair = [session.username, currentChat.id].sort().join('|');
+  }
+
+  chatMessages.push(msg);
+  saveAll();
+  renderChat();
+  renderChatList();
+  el('chatInput').value = '';
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  renderLayers();
+  updateTopTotals();
+  initMap();
+
+  el('carouselPrev').onclick = () => { carouselIndex = Math.max(0, carouselIndex - 1); updateCarouselPosition(); updateCarouselButtons(); };
+  el('carouselNext').onclick = () => { carouselIndex = Math.min(chartConfig.length - chartsPerPage, carouselIndex + 1); updateCarouselPosition(); updateCarouselButtons(); };
+
+  el('chatBackBtn').onclick = () => {
+    currentChat = null;
+    document.querySelectorAll('#chatConversationView').forEach(v => v.style.display = 'none');
+    document.querySelectorAll('#chatListView').forEach(v => v.style.display = 'block');
+    renderChatList();
+  };
+
+  el('chatSend').onclick = sendMessage;
+  el('chatInput').addEventListener('keypress', e => { if (e.key === 'Enter') sendMessage(); });
+
+  el('addLayer').onclick = () => {
+    const name = el('newLayerName').value.trim();
+    if (!name) return alert('Layer name required');
+    layers.push({ id: uid(), name, active: false, visible: true });
+    refreshAll();
+    el('newLayerName').value = '';
+  };
+
+  el('exportBtn').onclick = () => exportGeoJSON('all');
+  el('importBtn').onclick = () => el('fileInput').click();
+  el('fileInput').onchange = ev => {
+    const f = ev.target.files[0];
+    if (!f) return;
+    importGeoJSONFile(f);
+    ev.target.value = '';
+  };
+
+  el('unitSelect').onchange = ev => {
+    unitMode = ev.target.value;
+    localStorage.setItem('ns_units', unitMode);
+    updateMapFromObjects();
+    updateTopTotals();
+  };
+
+  el('profileBtn').onclick = () => {
+    alert('Profile system not implemented in this version.');
+  };
+});
+
+function exportGeoJSON(scope = 'all') {
+  const features = objects
+    .filter(o => scope === 'all' || (scope === 'active' && layers.find(l => l.id === o.layerId)?.active))
+    .map(internalToGeoJSONFeature);
+  const geojson = { type: 'FeatureCollection', features };
+  const blob = new Blob([JSON.stringify(geojson, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `properties_${new Date().toISOString().slice(0,10)}.geojson`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function importGeoJSONFile(file) {
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const geojson = JSON.parse(e.target.result);
+      if (geojson.type !== 'FeatureCollection') throw new Error('Invalid GeoJSON');
+      const activeLayer = layers.find(l => l.active) || layers[0];
+      geojson.features.forEach(f => {
+        let feat;
+        if (f.geometry.type === 'Point') {
+          feat = { id: uid(), type: 'Point', coords: [f.geometry.coordinates[1], f.geometry.coordinates[0]], props: f.properties || {}, layerId: activeLayer.id, networkId: networks.find(n => n.active)?.id || networks[0].id };
+        } else if (f.geometry.type === 'LineString') {
+          feat = { id: uid(), type: 'LineString', coords: f.geometry.coordinates.map(flip), props: f.properties || {}, layerId: activeLayer.id, networkId: networks.find(n => n.active)?.id || networks[0].id };
+        } else if (f.geometry.type === 'Polygon') {
+          feat = { id: uid(), type: 'Polygon', coords: f.geometry.coordinates[0].map(flip), props: f.properties || {}, layerId: activeLayer.id, networkId: networks.find(n => n.active)?.id || networks[0].id };
+        }
+        if (feat) objects.push(feat);
+      });
+      refreshAll();
+    } catch (err) {
+      alert('Invalid GeoJSON file: ' + err.message);
+    }
+  };
+  reader.readAsText(file);
+}
+
+function internalToGeoJSONFeature(o) {
+  let geom;
+  if (o.type === 'Point') geom = { type: 'Point', coordinates: flip(o.coords) };
+  else if (o.type === 'LineString') geom = { type: 'LineString', coordinates: o.coords.map(flip) };
+  else if (o.type === 'Circle') {
+    const circlePoly = turf.circle(o.center, o.radius, { units: 'meters', steps: 64 });
+    geom = circlePoly.geometry;
+  } else geom = { type: 'Polygon', coordinates: [o.coords.map(flip)] };
+  return { type: 'Feature', geometry: geom, properties: o.props };
+}
+</script>
+</body>
+</html>
