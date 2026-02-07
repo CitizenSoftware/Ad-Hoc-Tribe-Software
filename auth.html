@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Tribe Properties — Sign In</title>
+
+  <link rel="stylesheet" href="/src/styles/app.css" />
+</head>
+<body>
+  <div class="min-h-screen bg-slate-100 p-4">
+    <div class="card mb-4 px-4 py-3">
+      <div class="flex items-center gap-3">
+        <div class="flex items-center gap-2 text-sm font-semibold text-slate-700">TRIBE</div>
+        <nav class="flex items-center gap-2 text-xs">
+          <a class="rounded-full border border-slate-200 bg-white px-3 py-1" href="/index.html">Dashboard</a>
+          <a class="rounded-full border border-slate-200 bg-white px-3 py-1" href="/map.html">Map</a>
+          <a class="rounded-full border border-slate-200 bg-white px-3 py-1" href="/messages.html">Messages</a>
+        </nav>
+      </div>
+    </div>
+
+    <div class="mx-auto max-w-md">
+      <div class="card p-4">
+        <div class="mb-3 text-sm font-semibold text-slate-700">Sign In / Sign Up</div>
+        <div class="grid gap-3">
+          <input id="authEmail" type="email" class="h-9 w-full rounded-md border border-slate-200 px-3 text-sm" placeholder="Email" />
+          <input id="authPassword" type="password" class="h-9 w-full rounded-md border border-slate-200 px-3 text-sm" placeholder="Password" />
+          <input id="authUsername" type="text" class="h-9 w-full rounded-md border border-slate-200 px-3 text-sm" placeholder="Username (for sign up)" />
+        </div>
+        <div class="mt-4 flex flex-wrap gap-2">
+          <button class="btn btn-primary" id="authSignIn">Sign In</button>
+          <button class="btn" id="authSignUp">Sign Up</button>
+          <a class="btn" href="/index.html">Cancel</a>
+        </div>
+        <div id="authMessage" class="mt-3 text-xs text-slate-500"></div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="/src/pages/auth.js"></script>
+</body>
+</html>

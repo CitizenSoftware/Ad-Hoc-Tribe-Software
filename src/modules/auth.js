@@ -1,52 +1,91 @@
-import { state, saveAll, getActiveNetwork } from '../store.js';
-import { el, uid } from '../lib/utils.js';
+import { state, saveAll } from '../store.js';
+import { el } from '../lib/utils.js';
+import { supabase, hasSupabaseConfig } from '../lib/supabase.js';
 
-function ensureAccount(username) {
-  let acc = state.accounts.find(a => a.username === username);
-  if (!acc) {
-    acc = {
-      id: uid(),
-      username,
-      displayName: username,
-      profile: { networkId: getActiveNetwork().id }
-    };
-    state.accounts.push(acc);
-  } else if (!acc.profile) {
-    acc.profile = { networkId: getActiveNetwork().id };
-  } else if (!acc.profile.networkId) {
-    acc.profile.networkId = getActiveNetwork().id;
+async function loadProfile(userId) {
+  if (!userId) return null;
+  const { data } = await supabase
+    .from('profiles')
+    .select('username, display_name, network_id')
+    .eq('user_id', userId)
+    .maybeSingle();
+  return data || null;
+}
+
+async function syncSession(session, onChange) {
+  if (!session?.user) {
+    state.session = null;
+    saveAll();
+    if (onChange) onChange();
+    return;
   }
-  return acc;
+
+  const profile = await loadProfile(session.user.id);
+  const fallbackUsername = session.user.email?.split('@')[0] || 'user';
+  state.session = {
+    userId: session.user.id,
+    email: session.user.email,
+    username: profile?.username || fallbackUsername,
+    displayName: profile?.display_name || null,
+    networkId: profile?.network_id || null
+  };
+  saveAll();
+  if (onChange) onChange();
+}
+
+function openModal(modal) {
+  modal.classList.remove('hidden');
+  modal.classList.add('flex');
+}
+
+function closeModal(modal) {
+  modal.classList.add('hidden');
+  modal.classList.remove('flex');
 }
 
 export function initAuthButton({ onChange } = {}) {
   const btn = el('authBtn');
+  const currentUser = el('currentUser');
+
   if (!btn) return;
 
   const update = () => {
-    btn.textContent = state.session ? 'Sign Out' : 'Sign In';
+    const signedIn = Boolean(state.session);
+    btn.textContent = signedIn ? 'Sign Out' : 'Sign In';
+    if (currentUser) {
+      if (signedIn) {
+        const label = state.session.displayName || state.session.username || state.session.email || 'Signed In';
+        currentUser.textContent = label;
+        currentUser.classList.remove('hidden');
+      } else {
+        currentUser.textContent = '';
+        currentUser.classList.add('hidden');
+      }
+    }
   };
 
   update();
 
-  btn.onclick = () => {
-    if (state.session) {
-      state.session = null;
-      saveAll();
-      update();
-      if (onChange) onChange();
+  if (supabase) {
+    supabase.auth.getSession().then(({ data }) => {
+      syncSession(data.session, onChange).then(update);
+    });
+
+    supabase.auth.onAuthStateChange((_event, session) => {
+      syncSession(session, onChange).then(update);
+    });
+  }
+
+  btn.onclick = async () => {
+    if (!hasSupabaseConfig || !supabase) {
+      alert('Supabase is not configured. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY.');
       return;
     }
-
-    const username = window.prompt('Enter username');
-    if (!username) return;
-    const trimmed = username.trim();
-    if (!trimmed) return;
-
-    const acc = ensureAccount(trimmed);
-    state.session = { username: acc.username };
-    saveAll();
-    update();
-    if (onChange) onChange();
+    if (state.session) {
+      await supabase.auth.signOut();
+      update();
+      return;
+    }
+    window.location.href = '/auth.html';
   };
 }
